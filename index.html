@@ -13,20 +13,9 @@
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .animate-spin-custom { animation: spin 1s linear infinite; }
-    
-    /* Hilangkan arrow pada input number */
-    input::-webkit-outer-spin-button,
-    input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
-
-    /* Gaya khusus untuk placeholder */
-    input::placeholder, textarea::placeholder {
-      font-size: 0.9rem;
-      opacity: 0.2;
-      font-weight: 700;
-      color: #64748b;
-    }
-    
+    input::placeholder, textarea::placeholder { font-size: 0.9rem; opacity: 0.2; font-weight: 700; color: #64748b; }
     .scale-in { animation: scaleIn 0.2s ease-out; }
     @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   </style>
@@ -97,18 +86,14 @@
             document.body.appendChild(s);
           });
         };
-
         const initLibs = async () => {
           try {
             await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
             setLibStatus(prev => ({ ...prev, jspdf: true }));
             await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js');
             setLibStatus(prev => ({ ...prev, autotable: true }));
-          } catch (err) {
-            console.error("Gagal memuatkan pustaka PDF");
-          }
+          } catch (err) { console.error("Gagal memuatkan pustaka PDF"); }
         };
-
         initLibs();
       }, []);
 
@@ -185,13 +170,29 @@
         const guruAktif = formData.guruHadir.filter(n => n.trim() !== "");
         const rows = [];
         for (let i = 0; i < 4; i++) rows.push([guruAktif[i] || "", "", guruAktif[i+4] || "", ""]);
+        
         doc.autoTable({
           startY: currentY,
           head: [['Nama Guru Penasihat', 'T/Tangan', 'Nama Guru Penasihat', 'T/Tangan']],
           body: rows,
           theme: 'grid',
-          headStyles: { fillColor: [40, 40, 40], fontSize: 8, halign: 'center' },
-          styles: { fontSize: 8 },
+          headStyles: { 
+            fillColor: [40, 40, 40], 
+            fontSize: 8.5, 
+            halign: 'center',
+            lineWidth: 0.3,
+            lineColor: [50, 50, 50]
+          },
+          styles: { 
+            fontSize: 8.5,
+            lineWidth: 0.3, 
+            lineColor: [100, 100, 100], 
+            cellPadding: 2
+          },
+          columnStyles: {
+            1: { cellWidth: 20 }, 
+            3: { cellWidth: 20 }
+          },
           margin: { left: margin, right: margin }
         });
         currentY = doc.lastAutoTable.finalY + 6;
@@ -205,23 +206,29 @@
         [{ l: "LELAKI", v: `${formData.hadirLelaki || 0} / ${formData.totalLelaki || 0}` }, 
          { l: "PEREMPUAN", v: `${formData.hadirPerempuan || 0} / ${formData.totalPerempuan || 0}` }, 
          { l: "JUMLAH", v: `${totalHadir} / ${totalSemua}` }].forEach((s, i) => {
-          doc.setDrawColor(180).rect(margin + i*(boxW+5), currentY, boxW, 10);
+          doc.setDrawColor(100).setLineWidth(0.3).rect(margin + i*(boxW+5), currentY, boxW, 10);
           doc.setFontSize(7).text(s.l, margin + i*(boxW+5) + boxW/2, currentY + 4, { align: 'center' });
           doc.setFontSize(9).text(s.v, margin + i*(boxW+5) + boxW/2, currentY + 8, { align: 'center' });
         });
         currentY += 16;
 
-        const writeSection = (title, content, maxLines = 4) => {
-          doc.setFont("helvetica", "bold").setFontSize(9).text(title, margin, currentY);
-          currentY += 4; doc.setFont("helvetica", "normal");
-          const lines = doc.splitTextToSize(content || '-', pageWidth - (margin*2));
-          const toShow = lines.slice(0, maxLines);
-          doc.text(toShow, margin, currentY);
-          currentY += (toShow.length * 5) + 4;
+        const writeSectionWithBox = (title, content, boxHeight = 20) => {
+          doc.setFont("helvetica", "bold").setFontSize(8.5).text(title, margin, currentY);
+          currentY += 1.5;
+          const boxWidth = pageWidth - (margin * 2);
+          doc.setFont("helvetica", "normal").setFontSize(8.5);
+          const lines = doc.splitTextToSize(content || '-', boxWidth - 6);
+          const textHeight = (lines.length * 4.5) + 4;
+          const finalBoxHeight = Math.max(boxHeight, textHeight);
+
+          doc.setDrawColor(100).setLineWidth(0.3).rect(margin, currentY, boxWidth, finalBoxHeight);
+          doc.text(lines, margin + 3, currentY + 5);
+          currentY += finalBoxHeight + 5;
         };
-        writeSection("NILAI SIVIK:", formData.nilaiSivik, 1);
-        writeSection("AKTIVITI DIJALANKAN:", formData.aktivitiDijalankan, 6);
-        writeSection("REFLEKSI / IMPAK:", formData.refleksiImpak, 4);
+
+        writeSectionWithBox("NILAI SIVIK:", formData.nilaiSivik, 10);
+        writeSectionWithBox("AKTIVITI YANG DIJALANKAN:", formData.aktivitiDijalankan, 25);
+        writeSectionWithBox("REFLEKSI / IMPAK:", formData.refleksiImpak, 18);
 
         if (images.length > 0) {
           const iw = 75; const ih = 40; const gap = 10;
@@ -229,20 +236,20 @@
           let startImgX = (pageWidth - totalW) / 2;
           images.forEach((img, idx) => {
             const x = startImgX + (idx * (iw + gap));
-            doc.setDrawColor(0).roundedRect(x, currentY, iw, ih, 1, 1, 'S');
+            doc.setDrawColor(150).setLineWidth(0.2).roundedRect(x, currentY, iw, ih, 1, 1, 'S');
             try { doc.addImage(img, 'JPEG', x + 0.5, currentY + 0.5, iw - 1, ih - 1); } catch(e) {}
           });
         }
 
-        const bottomY = pageHeight - 40; 
+        const bottomY = pageHeight - 35; 
         const printableWidth = pageWidth - (margin * 2);
         const col1X = margin;
         const col2X = margin + (printableWidth * 0.30);
         const col3X = margin + (printableWidth * 0.65);
         const drawSignature = (label, name, title, x, maxW) => {
           doc.setFontSize(8).setFont("helvetica", "normal").text(label + " oleh:", x, bottomY);
-          doc.setFont("helvetica", "bold").setFontSize(9).text(`(${name.toUpperCase()})`, x, bottomY + 18);
-          doc.setFont("helvetica", "normal").setFontSize(7).text(title, x, bottomY + 22, { maxWidth: maxW });
+          doc.setFont("helvetica", "bold").setFontSize(9).text(`(${name.toUpperCase()})`, x, bottomY + 16);
+          doc.setFont("helvetica", "normal").setFontSize(7).text(title, x, bottomY + 20, { maxWidth: maxW });
         };
         drawSignature("Disediakan", formData.disediakanOleh, "GURU PENASIHAT", col1X, (printableWidth * 0.28));
         drawSignature("Disemak", formData.disemakOleh, formData.jawatanDisemak, col2X, (printableWidth * 0.32));
@@ -257,12 +264,8 @@
             return;
         }
         setIsGenerating(true);
-        try {
-          const doc = await createPDFInstance();
-          doc.save(getFileName());
-        } catch (err) {
-          setNotification({ type: 'error', message: 'Ralat menjana PDF.', btnText: 'OK' });
-        }
+        try { const doc = await createPDFInstance(); doc.save(getFileName()); } 
+        catch (err) { setNotification({ type: 'error', message: 'Ralat menjana PDF.', btnText: 'OK' }); }
         setIsGenerating(false);
       };
 
@@ -272,37 +275,24 @@
             setNotification({ type: 'error', message: 'Sila lengkapkan laporan sebelum menyimpan ke Drive.', btnText: 'OK' });
             return;
         }
-
         setIsSavingToDrive(true);
         try {
           const doc = await createPDFInstance();
           const pdfBase64 = doc.output('datauristring').split(',')[1];
           const fileName = getFileName();
           const webAppUrl = 'https://script.google.com/macros/s/AKfycbwBxAOWGtwoZohYErXOivknU_rDiLDFugwzHpoHcv-Q0rOu8zJxxta4PEJZ6Sr6BlhX/exec'; 
-
           await fetch(webAppUrl, {
-            method: 'POST',
-            mode: 'no-cors', 
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pdfBase64, fileName })
           });
-
-          setNotification({ 
-            type: 'success', 
-            message: `LAPORAN AKTIVITI telah berjaya dihantar ke Google Drive.`,
-            btnText: 'OK'
-          });
-
+          setNotification({ type: 'success', message: `LAPORAN AKTIVITI telah berjaya dihantar ke Google Drive.`, btnText: 'OK' });
         } catch (e) { 
           setNotification({ type: 'error', message: 'Gagal menghantar ke Google Drive.', btnText: 'OK' });
-        } finally { 
-          setIsSavingToDrive(false); 
-        }
+        } finally { setIsSavingToDrive(false); }
       };
 
       return (
         <div className="max-w-4xl mx-auto my-0 md:my-10 bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] rounded-none md:rounded-[2.5rem] overflow-hidden">
-          
           {notification && (
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
               <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl scale-in">
@@ -319,7 +309,8 @@
           <header className="relative bg-slate-900 text-white pt-10 pb-12 px-6 text-center border-b-4 border-indigo-500">
             <img src={schoolLogoUrl} alt="Logo" className="w-20 h-20 mx-auto mb-5 drop-shadow-xl" />
             <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight mb-2">LAPORAN AKTIVITI KOKURIKULUM</h1>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-[0.3em]">SK Seri Bandi 2</h2>
+            {/* Membesarkan sedikit font nama sekolah */}
+            <h2 className="text-base md:text-lg font-bold text-slate-300 uppercase tracking-[0.3em]">SK Seri Bandi 2</h2>
           </header>
 
           <div className="p-6 md:p-10 space-y-10">
@@ -333,7 +324,6 @@
                   <option>LAPORAN AKTIVITI RUMAH SUKAN</option>
                 </select>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Bil. Perjumpaan</label>
@@ -348,7 +338,6 @@
                   <input type="text" readOnly value={formData.hari} className="w-full bg-transparent font-bold text-indigo-600 outline-none text-sm" />
                 </div>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Tempat / Lokasi</label>
@@ -377,8 +366,9 @@
 
             <section className="bg-slate-900 rounded-[2rem] p-7 shadow-xl">
               <div className="flex items-center justify-between mb-6">
+                {/* Membuang perkataan Statistik */}
                 <h2 className="text-white font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-3">
-                  <span className="w-6 h-[2px] bg-emerald-500"></span> Statistik Kehadiran Murid
+                  <span className="w-6 h-[2px] bg-emerald-500"></span> Kehadiran Murid
                 </h2>
                 <div className="px-3 py-1 bg-slate-800 rounded-full border border-slate-700">
                    <span className="text-[9px] font-bold text-slate-400 uppercase">Jumlah: </span>
@@ -387,7 +377,6 @@
                    </span>
                 </div>
               </div>
-              
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: 'HADIR (L)', key: 'hadirLelaki', color: 'text-blue-400', border: 'border-blue-500/30' },
@@ -397,14 +386,7 @@
                 ].map(f => (
                   <div key={f.key} className={`bg-slate-800/50 px-4 py-4 rounded-xl border ${f.border} group transition-all hover:bg-slate-800`}>
                     <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-[0.1em]">{f.label}</label>
-                    <input 
-                      type="number" 
-                      name={f.key} 
-                      value={formData[f.key] === 0 ? '' : formData[f.key]} 
-                      onChange={handleInputChange} 
-                      placeholder="0"
-                      className={`w-full bg-transparent font-bold text-2xl outline-none ${f.color} text-center`} 
-                    />
+                    <input type="number" name={f.key} value={formData[f.key] === 0 ? '' : formData[f.key]} onChange={handleInputChange} placeholder="0" className={`w-full bg-transparent font-bold text-2xl outline-none ${f.color} text-center`} />
                   </div>
                 ))}
               </div>
@@ -418,21 +400,20 @@
                   {senaraiNilaiSivik.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Ringkasan Aktiviti</label>
-                <textarea name="aktivitiDijalankan" value={formData.aktivitiDijalankan} placeholder="" onChange={handleInputChange} className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl h-36 text-sm outline-none focus:border-indigo-500 transition-all"></textarea>
+                <textarea name="aktivitiDijalankan" value={formData.aktivitiDijalankan} onChange={handleInputChange} className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl h-36 text-sm outline-none focus:border-indigo-500 transition-all"></textarea>
               </div>
-
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Refleksi & Impak</label>
-                <textarea name="refleksiImpak" value={formData.refleksiImpak} placeholder="" onChange={handleInputChange} className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl h-24 text-sm outline-none focus:border-indigo-500 transition-all"></textarea>
+                <textarea name="refleksiImpak" value={formData.refleksiImpak} onChange={handleInputChange} className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl h-24 text-sm outline-none focus:border-indigo-500 transition-all"></textarea>
               </div>
             </div>
 
             <section className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-center shadow-inner">
+              {/* Menukar perkataan Foto kepada Gambar */}
               <label className={`inline-flex items-center gap-3 px-6 py-3 rounded-full font-black text-[10px] transition-all shadow-md mb-6 cursor-pointer tracking-wider ${images.length >= 2 ? 'bg-slate-200 text-slate-400' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
-                <Icon name="camera" size={16} /> MUAT NAIK FOTO AKTIVITI ({images.length}/2)
+                <Icon name="camera" size={16} /> MUAT NAIK GAMBAR AKTIVITI ({images.length}/2)
                 <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={images.length >= 2} />
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -471,13 +452,11 @@
               <button onClick={handleSavePDF} disabled={isGenerating || isSavingToDrive} className={`flex-1 py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 transition-all tracking-wider ${isGenerating ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl active:scale-95'}`}>
                 {isGenerating ? <><Icon name="loader" className="animate-spin-custom" /> MENJANA PDF...</> : <><Icon name="download" /> MUAT TURUN PDF</>}
               </button>
-
               <button onClick={handleDriveSave} disabled={isGenerating || isSavingToDrive} className={`flex-1 py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 transition-all tracking-wider ${isSavingToDrive ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xl active:scale-95'}`}>
                 {isSavingToDrive ? <><Icon name="loader" className="animate-spin-custom" /> MENYIMPAN...</> : <><Icon name="cloud" /> SIMPAN KE DRIVE</>}
               </button>
             </div>
           </div>
-          
           <footer className="bg-slate-50 py-4 px-6 text-center border-t border-slate-100">
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">UNIT KOKURIKULUM SK SERI BANDI 2</p>
           </footer>
